@@ -17,9 +17,6 @@ pub enum TokenizerError {
     #[cfg(feature = "candle")]
     #[error("Candle error: {0}")]
     CandleError(#[from] candle_core::Error),
-    
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, TokenizerError>; 

@@ -61,4 +61,7 @@ harness = false
 
 [[bench]]
 name = "three_way_benchmark"
-harness = false 
+harness = false
+
+[[example]]
+name = "async_batch_processing" 

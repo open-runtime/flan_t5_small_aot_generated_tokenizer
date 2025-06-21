@@ -692,7 +692,7 @@ fn test_decode_consistency() {
         println!("Rust tokens: {:?}", rust_tokens);
         
         // Check if tokenization matches
-        let all_match = our_tokens == hf_tokens && our_tokens == rust_tokens;
+        let _all_match = our_tokens == hf_tokens && our_tokens == rust_tokens;
         let hf_rust_match = hf_tokens == rust_tokens;
         
         if hf_rust_match && our_tokens != hf_tokens {
@@ -737,8 +737,7 @@ fn test_special_tokens_handling() {
     println!("\n=== Testing Special Tokens ===");
     
     let mut config = TokenizerConfig::default();
-    config.add_eos = true;
-    config.add_bos = false;
+    config.add_eos_token = true;
     
     let tokenizer = FlanT5Tokenizer::new(config);
     

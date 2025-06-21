@@ -308,11 +308,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     writeln!(file, "| Tokenizer | Ops/sec | MB/sec |")?;
     writeln!(file, "|-----------|---------|--------|")?;
-    writeln!(file, "| **Our tokenizer** | {:,} | {:.1} |", 
+    writeln!(file, "| **Our tokenizer** | {} | {:.1} |", 
         our_count, (our_count * MEDIUM_TEXT.len()) as f64 / 1_000_000.0)?;
-    writeln!(file, "| HuggingFace | {:,} | {:.1} |", 
+    writeln!(file, "| HuggingFace | {} | {:.1} |", 
         hf_count, (hf_count * MEDIUM_TEXT.len()) as f64 / 1_000_000.0)?;
-    writeln!(file, "| rust_tokenizers | {:,} | {:.1} |", 
+    writeln!(file, "| rust_tokenizers | {} | {:.1} |", 
         rust_count, (rust_count * MEDIUM_TEXT.len()) as f64 / 1_000_000.0)?;
     writeln!(file)?;
 

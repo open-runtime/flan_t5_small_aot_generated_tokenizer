@@ -10,9 +10,6 @@ use ahash::AHasher;
 // Import generated vocabulary data
 include!(concat!(env!("OUT_DIR"), "/tokenizer_data.rs"));
 
-const WHITESPACE_MARKER: char = '▁';
-const BYTE_FALLBACK_PREFIX: &str = "<0x";
-
 pub struct FlanT5Tokenizer {
     pub config: TokenizerConfig,
     // Zero-copy cache: hash of text -> Arc<Vec<u32>>
@@ -60,7 +57,11 @@ impl FlanT5Tokenizer {
     /// Encode text to token IDs
     pub fn encode(&self, text: &str) -> Result<Vec<u32>> {
         if text.is_empty() {
-            return Ok(vec![]);
+            return if self.config.add_eos_token {
+                Ok(vec![EOS_TOKEN_ID])
+            } else {
+                Ok(vec![])
+            };
         }
         
         if text.len() > self.config.max_length * 6 {
@@ -306,14 +307,7 @@ impl FlanT5Tokenizer {
     }
 }
 
-fn parse_byte_fallback(token: &str) -> Option<u8> {
-    if token.starts_with(BYTE_FALLBACK_PREFIX) && token.ends_with('>') {
-        let hex_str = &token[BYTE_FALLBACK_PREFIX.len()..token.len() - 1];
-        u8::from_str_radix(hex_str, 16).ok()
-    } else {
-        None
-    }
-}
+
 
 #[cfg(test)]
 mod tests {
