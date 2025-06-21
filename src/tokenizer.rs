@@ -268,7 +268,10 @@ impl FlanT5Tokenizer {
                 
                 // Check if this substring exists in vocabulary
                 if let Some(&token_id) = TOKEN_TO_ID.get(candidate) {
-                    let token_score = TOKEN_SCORES.get(candidate).copied().unwrap_or(10.0);
+                    // Use negative log probability as score (from the tokenizer JSON)
+                    // More negative = more common = better
+                    // Convert to positive cost where lower is better
+                    let token_score = -TOKEN_SCORES.get(candidate).copied().unwrap_or(-10.0);
                     let score = best_score[start_byte] + token_score;
                     
                     if score < best_score[end_byte] {
@@ -282,12 +285,27 @@ impl FlanT5Tokenizer {
             // Handle unknown character - single character fallback
             if i + 1 < byte_indices.len() {
                 let (next_byte, _) = byte_indices[i + 1];
-                let unk_score = best_score[start_byte] + 10.0; // Penalty for unknown
+                let single_char = &text[start_byte..next_byte];
                 
-                if unk_score < best_score[next_byte] {
-                    best_score[next_byte] = unk_score;
-                    best_token_id[next_byte] = UNK_TOKEN_ID;
-                    best_token_start[next_byte] = start_byte;
+                // Check if single character exists in vocabulary
+                if let Some(&char_token_id) = TOKEN_TO_ID.get(single_char) {
+                    let char_score = -TOKEN_SCORES.get(single_char).copied().unwrap_or(-10.0);
+                    let score = best_score[start_byte] + char_score;
+                    
+                    if score < best_score[next_byte] {
+                        best_score[next_byte] = score;
+                        best_token_id[next_byte] = char_token_id;
+                        best_token_start[next_byte] = start_byte;
+                    }
+                } else {
+                    // True unknown character - use high penalty
+                    let unk_score = best_score[start_byte] + 100.0;
+                    
+                    if unk_score < best_score[next_byte] {
+                        best_score[next_byte] = unk_score;
+                        best_token_id[next_byte] = UNK_TOKEN_ID;
+                        best_token_start[next_byte] = start_byte;
+                    }
                 }
             }
         }

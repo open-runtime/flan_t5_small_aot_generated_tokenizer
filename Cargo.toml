@@ -64,4 +64,8 @@ name = "three_way_benchmark"
 harness = false
 
 [[example]]
-name = "async_batch_processing" 
+name = "async_batch_processing"
+
+[[example]]
+name = "candle_example"
+required-features = ["candle"] 

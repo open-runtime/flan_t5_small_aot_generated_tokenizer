@@ -194,6 +194,7 @@ impl TokenizerCandle for FlanT5Tokenizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TokenizerConfig;
     
     #[test]
     fn test_candle_integration() {
@@ -205,5 +206,62 @@ mod tests {
         
         assert_eq!(tensor.input_ids.dims(), &[1, tensor.input_ids.dims()[1]]);
         assert_eq!(tensor.attention_mask.dims(), tensor.input_ids.dims());
+        assert_eq!(tensor.batch_size(), 1);
+        assert!(tensor.seq_len() > 0);
+    }
+    
+    #[test]
+    fn test_batch_tokenization() {
+        let device = Device::Cpu;
+        let tokenizer = FlanT5Tokenizer::with_default_config();
+        
+        let texts = vec!["First text", "Second text", "Third text"];
+        let tensor = tokenizer.batch_tokenize_to_tensor(&texts, &device).unwrap();
+        
+        assert_eq!(tensor.batch_size(), 3);
+        assert_eq!(tensor.input_ids.dims()[0], 3);
+        assert_eq!(tensor.attention_mask.dims()[0], 3);
+    }
+    
+    #[test]
+    fn test_decode_from_tensor() {
+        let device = Device::Cpu;
+        let tokenizer = FlanT5Tokenizer::with_default_config();
+        
+        let texts = vec!["Hello world", "Test decode"];
+        let tensor = tokenizer.batch_tokenize_to_tensor(&texts, &device).unwrap();
+        let decoded = tokenizer.decode_from_tensor(&tensor.input_ids).unwrap();
+        
+        assert_eq!(decoded.len(), 2);
+        // Note: decoded text may differ slightly due to tokenization
+        assert!(decoded[0].contains("Hello"));
+        assert!(decoded[1].contains("Test"));
+    }
+    
+    #[test]
+    fn test_position_ids() {
+        let device = Device::Cpu;
+        let tokenizer = FlanT5Tokenizer::with_default_config();
+        
+        let pos_ids = tokenizer.create_position_ids(10, 2, &device).unwrap();
+        assert_eq!(pos_ids.dims(), &[2, 10]);
+        
+        // Check values
+        let values: Vec<u32> = pos_ids.get(0).unwrap().to_vec1().unwrap();
+        assert_eq!(values, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+    
+    #[test]
+    fn test_padding_config() {
+        let device = Device::Cpu;
+        
+        let mut config = TokenizerConfig::default();
+        config.pad_to_max_length = true;
+        config.max_length = 20;
+        
+        let tokenizer = FlanT5Tokenizer::new(config);
+        let tensor = tokenizer.tokenize_to_tensor("Short", &device).unwrap();
+        
+        assert_eq!(tensor.seq_len(), 20); // Should be padded to max_length
     }
 } 

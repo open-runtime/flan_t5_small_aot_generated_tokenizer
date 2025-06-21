@@ -1,95 +1,85 @@
-use flan_t5_tokenizer::{TOKEN_TO_ID, TOKEN_SCORES};
+use flan_t5_tokenizer::{FlanT5Tokenizer, TokenizerConfig};
+
+// Reimplement a simple version to understand the issue
+fn debug_tokenize(text: &str) {
+    println!("=== Debug Tokenization for: '{}' ===", text);
+    
+    // First, preprocess the text
+    let mut preprocessed = String::new();
+    preprocessed.push('▁'); // Add prefix space
+    
+    for ch in text.chars() {
+        if ch == ' ' {
+            preprocessed.push('▁');
+        } else {
+            preprocessed.push(ch);
+        }
+    }
+    
+    println!("Preprocessed: '{}'", preprocessed);
+    
+    // Create tokenizer to check vocabulary
+    let tokenizer = FlanT5Tokenizer::with_default_config();
+    
+    // Check what tokens exist for substrings
+    println!("\nChecking substrings:");
+    let test_substrings = [
+        "▁Hello",
+        "▁Hell",
+        "▁Hel", 
+        "▁He",
+        "▁H",
+        "▁",
+        "Hello",
+        "world",
+        "▁world",
+        "▁world!",
+        "!",
+    ];
+    
+    for substr in &test_substrings {
+        if let Some(id) = tokenizer.token_to_id(substr) {
+            println!("  '{}' -> Token ID {}", substr, id);
+        }
+    }
+    
+    // Now tokenize with the actual tokenizer
+    let tokens = tokenizer.encode(text).unwrap();
+    println!("\nActual tokenization:");
+    println!("Token count: {}", tokens.len());
+    println!("Token IDs: {:?}", tokens);
+    
+    // Decode to verify
+    let decoded = tokenizer.decode(&tokens).unwrap();
+    println!("\nDecoded: '{}'", decoded);
+    println!("Match: {}", text == decoded);
+}
 
 fn main() {
-    println!("=== Viterbi Algorithm Debug ===\n");
+    println!("Debug Viterbi Tokenization\n");
     
-    let text = "hello";
-    println!("Input text: {:?}\n", text);
+    // Test cases
+    debug_tokenize("Hello world!");
     
-    // Test what tokens we can find
-    println!("Token lookups:");
+    println!("\n{}\n", "=".repeat(50));
     
-    // Check individual characters
-    for ch in text.chars() {
-        let ch_str = ch.to_string();
-        if let Some(&id) = TOKEN_TO_ID.get(&ch_str) {
-            let score = TOKEN_SCORES.get(&ch_str).copied().unwrap_or(999.0);
-            println!("  {:?} -> ID: {}, Score: {:.2}", ch_str, id, score);
-        } else {
-            println!("  {:?} -> NOT FOUND", ch_str);
+    debug_tokenize("Hello");
+    
+    println!("\n{}\n", "=".repeat(50));
+    
+    // Test if the issue is with the preprocessing
+    let tokenizer = FlanT5Tokenizer::with_default_config();
+    
+    // Try encoding preprocessed text directly
+    println!("Testing direct token lookup:");
+    let test_tokens = ["▁Hello", "▁world", "!", "▁The", "▁quick"];
+    for token in &test_tokens {
+        if let Some(id) = tokenizer.token_to_id(token) {
+            println!("  Token '{}' -> ID {}", token, id);
+            
+            // Try to encode just this token
+            let encoded = tokenizer.encode(token).unwrap();
+            println!("    Encoding '{}' produces: {:?}", token, encoded);
         }
     }
-    
-    // Check with space marker
-    println!("\nWith space marker:");
-    for ch in text.chars() {
-        let ch_with_marker = format!("▁{}", ch);
-        if let Some(&id) = TOKEN_TO_ID.get(&ch_with_marker) {
-            let score = TOKEN_SCORES.get(&ch_with_marker).copied().unwrap_or(999.0);
-            println!("  {:?} -> ID: {}, Score: {:.2}", ch_with_marker, id, score);
-        } else {
-            println!("  {:?} -> NOT FOUND", ch_with_marker);
-        }
-    }
-    
-    // Check the full word
-    println!("\nFull word:");
-    if let Some(&id) = TOKEN_TO_ID.get(text) {
-        let score = TOKEN_SCORES.get(text).copied().unwrap_or(999.0);
-        println!("  {:?} -> ID: {}, Score: {:.2}", text, id, score);
-    } else {
-        println!("  {:?} -> NOT FOUND", text);
-    }
-    
-    // Check with space marker
-    let text_with_marker = format!("▁{}", text);
-    if let Some(&id) = TOKEN_TO_ID.get(&text_with_marker) {
-        let score = TOKEN_SCORES.get(&text_with_marker).copied().unwrap_or(999.0);
-        println!("  {:?} -> ID: {}, Score: {:.2}", text_with_marker, id, score);
-    } else {
-        println!("  {:?} -> NOT FOUND", text_with_marker);
-    }
-    
-    // Now let's simulate what our algorithm should be doing
-    println!("\n\nSimulating tokenization:");
-    println!("Text starts at beginning, so we should look for tokens with ▁ prefix");
-    
-    // For position 0 (start of text)
-    println!("\nPosition 0:");
-    
-    // Check progressively longer substrings
-    let chars: Vec<char> = text.chars().collect();
-    for len in 1..=chars.len() {
-        let substr: String = chars[0..len].iter().collect();
-        let substr_with_marker = format!("▁{}", substr);
-        
-        if let Some(&id) = TOKEN_TO_ID.get(&substr_with_marker) {
-            let score = TOKEN_SCORES.get(&substr_with_marker).copied().unwrap_or(999.0);
-            println!("  {:?} -> ID: {}, Score: {:.2} ✓", substr_with_marker, id, score);
-        } else {
-            println!("  {:?} -> NOT FOUND", substr_with_marker);
-        }
-    }
-    
-    // Compare scores
-    println!("\n\nScore comparison:");
-    println!("Character-by-character path:");
-    let mut char_score = 0.0;
-    for ch in text.chars() {
-        if let Some(_) = TOKEN_TO_ID.get(&ch.to_string()) {
-            let score = TOKEN_SCORES.get(&ch.to_string()).copied().unwrap_or(999.0);
-            println!("  '{}': {:.2}", ch, score);
-            char_score += score;
-        }
-    }
-    println!("  Total: {:.2}", char_score);
-    
-    println!("\nWhole word path:");
-    if let Some(&id) = TOKEN_TO_ID.get(&text_with_marker) {
-        let score = TOKEN_SCORES.get(&text_with_marker).copied().unwrap_or(999.0);
-        println!("  {:?} (ID {}): {:.2}", text_with_marker, id, score);
-        println!("  Total: {:.2}", score);
-    }
-    
-    println!("\nLower score wins! The whole word should be chosen.");
 } 
