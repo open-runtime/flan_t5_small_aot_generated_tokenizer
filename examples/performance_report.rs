@@ -579,13 +579,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hf_throughput_speedup = our_mean / hf_mean;
     let rust_throughput_speedup = our_mean / rust_mean;
     
-    writeln!(file, "| Tokenizer | Ops/sec | Std Dev | MB/sec | Speedup vs HF | Speedup vs rust_tokenizers |")?;
-    writeln!(file, "|-----------|---------|---------|--------|---------------|----------------------------|")?;
-    writeln!(file, "| **Tsavo's tokenizer** | {:.0} | ±{:.0} | {:.1} | - | - |", 
+    writeln!(file, "| Tokenizer | Ops/sec | Std Dev | MB/sec | Performance vs Tsavo's |")?;
+    writeln!(file, "|-----------|---------|---------|--------|------------------------|")?;
+    writeln!(file, "| **Tsavo's tokenizer** | {:.0} | ±{:.0} | {:.1} | Baseline |", 
         our_mean, our_std, (our_mean * MEDIUM_TEXT.len() as f64) / 1_000_000.0)?;
-    writeln!(file, "| HuggingFace | {:.0} | ±{:.0} | {:.1} | {:.1}x slower | - |", 
+    writeln!(file, "| HuggingFace | {:.0} | ±{:.0} | {:.1} | {:.1}x slower than Tsavo's |", 
         hf_mean, hf_std, (hf_mean * MEDIUM_TEXT.len() as f64) / 1_000_000.0, hf_throughput_speedup)?;
-    writeln!(file, "| rust_tokenizers | {:.0} | ±{:.0} | {:.1} | - | {:.1}x slower |", 
+    writeln!(file, "| rust_tokenizers | {:.0} | ±{:.0} | {:.1} | {:.1}x slower than Tsavo's |", 
         rust_mean, rust_std, (rust_mean * MEDIUM_TEXT.len() as f64) / 1_000_000.0, rust_throughput_speedup)?;
     writeln!(file)?;
 
@@ -734,14 +734,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         
         let hf_speedup_str = if hf_speedup > 0.0 {
-            format!("{:.1}x", hf_speedup)
+            format!("{:.1}x faster than HF", hf_speedup)
         } else {
-            format!("{:.1}x slower", -hf_speedup)
+            format!("HF is {:.1}x faster", -hf_speedup)
         };
         let rust_speedup_str = if rust_speedup > 0.0 {
-            format!("{:.1}x", rust_speedup)
+            format!("{:.1}x faster than rust_tokenizers", rust_speedup)
         } else {
-            format!("{:.1}x slower", -rust_speedup)
+            format!("rust_tokenizers is {:.1}x faster", -rust_speedup)
         };
         
         writeln!(file, "| {} | {:.1} μs | {:.1} μs | {:.1} μs | {} | {} |",
@@ -765,17 +765,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(file, "- **Tsavo's tokenizer**: {:.1}±{:.1} μs average", tsavo_overall, tsavo_std)?;
     
     let hf_comparison = if tsavo_overall < hf_overall {
-        format!("{:.1}x slower", hf_overall / tsavo_overall)
+        format!("HF is {:.1}x slower than Tsavo's", hf_overall / tsavo_overall)
     } else {
-        format!("{:.1}x faster for Tsavo's", tsavo_overall / hf_overall)
+        format!("HF is {:.1}x faster than Tsavo's", tsavo_overall / hf_overall)
     };
     writeln!(file, "- **HuggingFace**: {:.1}±{:.1} μs average ({})", 
         hf_overall, hf_std, hf_comparison)?;
     
     let rust_comparison = if tsavo_overall < rust_overall {
-        format!("{:.1}x slower", rust_overall / tsavo_overall)
+        format!("rust_tokenizers is {:.1}x slower than Tsavo's", rust_overall / tsavo_overall)
     } else {
-        format!("{:.1}x faster for Tsavo's", tsavo_overall / rust_overall)
+        format!("rust_tokenizers is {:.1}x faster than Tsavo's", tsavo_overall / rust_overall)
     };
     writeln!(file, "- **rust_tokenizers**: {:.1}±{:.1} μs average ({})", 
         rust_overall, rust_std, rust_comparison)?;
