@@ -317,10 +317,10 @@ fn get_edge_cases() -> Vec<String> {
 #[test]
 fn test_all_production_queries() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Production Queries ===");
@@ -367,10 +367,10 @@ fn test_all_production_queries() {
 #[test]
 fn test_developer_conversations() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Developer Conversations ===");
@@ -417,10 +417,10 @@ fn test_developer_conversations() {
 #[test]
 fn test_digital_worker_conversations() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Digital Worker Conversations ===");
@@ -467,10 +467,10 @@ fn test_digital_worker_conversations() {
 #[test]
 fn test_multi_turn_conversations() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Multi-turn Conversations ===");
@@ -521,9 +521,9 @@ fn test_multi_turn_conversations() {
 #[test]
 fn test_edge_cases() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Edge Cases ===");
@@ -662,9 +662,9 @@ fn test_batch_processing() {
 #[test]
 fn test_decode_consistency() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Testing Decode Consistency ===");

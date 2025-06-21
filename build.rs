@@ -53,7 +53,7 @@ struct PreTokenizer {
     add_prefix_space: bool,
 }
 
-const TOKENIZER_JSON: &str = "flan_t5_small_tokenizer.json";
+const TOKENIZER_JSON: &str = "model/flan_t5_small_tokenizer.json";
 const METASPACE_REPLACEMENT: &str = "▁";
 
 fn main() -> Result<()> {

@@ -10,14 +10,14 @@ fn main() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
     
     // HuggingFace tokenizer
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // rust_tokenizers T5 tokenizer - check if model files exist
-    let spm_path = Path::new("spiece.model");
+    let spm_path = Path::new("model/spiece.model");
     let rust_tokenizer = if spm_path.exists() {
         println!("Loading rust_tokenizers with spiece.model...\n");
-        Some(T5Tokenizer::from_file("spiece.model", false)
+        Some(T5Tokenizer::from_file("model/spiece.model", false)
             .expect("Failed to load rust_tokenizers"))
     } else {
         println!("Warning: spiece.model not found. Skipping rust_tokenizers comparison.\n");

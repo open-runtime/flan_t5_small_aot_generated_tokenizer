@@ -62,7 +62,7 @@ fn main() {
     
     // Compare with HuggingFace
     println!("\n\nComparison with HuggingFace:");
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HF tokenizer");
     let hf_encoding = hf_tokenizer.encode(text, false).expect("HF encode failed");
     let hf_tokens: Vec<u32> = hf_encoding.get_ids().to_vec();

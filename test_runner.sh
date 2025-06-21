@@ -25,19 +25,19 @@ NC='\033[0m' # No Color
 check_files() {
     echo -e "${YELLOW}Checking required files...${NC}"
     
-    if [ ! -f "flan_t5_small_tokenizer.json" ]; then
-        echo -e "${RED}Error: flan_t5_small_tokenizer.json not found!${NC}"
+    if [ ! -f "model/flan_t5_small_tokenizer.json" ]; then
+        echo -e "${RED}Error: model/flan_t5_small_tokenizer.json not found!${NC}"
         echo "Download with:"
         echo "  curl -L https://huggingface.co/google/flan-t5-small/resolve/main/tokenizer.json \\"
-        echo "    -o flan_t5_small_tokenizer.json"
+        echo "    -o model/flan_t5_small_tokenizer.json"
         exit 1
     fi
     
-    if [ ! -f "spiece.model" ]; then
-        echo -e "${RED}Error: spiece.model not found!${NC}"
+    if [ ! -f "model/spiece.model" ]; then
+        echo -e "${RED}Error: model/spiece.model not found!${NC}"
         echo "Download with:"
         echo "  curl -L https://huggingface.co/google/flan-t5-small/resolve/main/spiece.model \\"
-        echo "    -o spiece.model"
+        echo "    -o model/spiece.model"
         exit 1
     fi
     

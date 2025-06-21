@@ -23,7 +23,7 @@ const REAL_WORLD_QUERIES: &[&str] = &[
 
 fn bench_single_tokenization(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut group = c.benchmark_group("single_tokenization");
@@ -63,7 +63,7 @@ fn bench_single_tokenization(c: &mut Criterion) {
 fn bench_batch_tokenization(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
     let batch_tokenizer = BatchTokenizer::new(our_tokenizer.clone(), BatchConfig::default());
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut group = c.benchmark_group("batch_tokenization");
@@ -122,7 +122,7 @@ fn bench_batch_tokenization(c: &mut Criterion) {
 
 fn bench_real_world_queries(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut group = c.benchmark_group("real_world_queries");
@@ -153,7 +153,7 @@ fn bench_real_world_queries(c: &mut Criterion) {
 
 fn bench_decode(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut group = c.benchmark_group("decode");
@@ -237,7 +237,7 @@ fn bench_memory_usage(c: &mut Criterion) {
     
     group.bench_function("hf_tokenizer_creation", |b| {
         b.iter(|| {
-            let _ = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json");
+            let _ = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json");
         });
     });
     

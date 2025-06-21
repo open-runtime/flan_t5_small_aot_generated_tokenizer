@@ -277,12 +277,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         reset_memory_tracking();
         let start = Instant::now();
-        let _ = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json");
+        let _ = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json");
         hf_times.push((start.elapsed().as_secs_f64() * 1000.0, get_current_memory()));
         
         reset_memory_tracking();
         let start = Instant::now();
-        let _ = T5Tokenizer::from_file("spiece.model", false);
+        let _ = T5Tokenizer::from_file("model/spiece.model", false);
         rust_times.push((start.elapsed().as_secs_f64() * 1000.0, get_current_memory()));
     }
     
@@ -328,8 +328,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize tokenizers for subsequent tests
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json").unwrap();
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false).unwrap();
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json").unwrap();
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false).unwrap();
 
     // 2. SINGLE TOKENIZATION SPEED & MEMORY BY INPUT SIZE
     writeln!(file, "## 2. Single Tokenization Speed & Memory by Input Size")?;

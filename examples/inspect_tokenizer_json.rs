@@ -5,7 +5,7 @@ fn main() {
     println!("=== Inspecting FLAN-T5 Tokenizer JSON ===\n");
     
     // Read the tokenizer JSON
-    let json_str = fs::read_to_string("flan_t5_small_tokenizer.json")
+    let json_str = fs::read_to_string("model/flan_t5_small_tokenizer.json")
         .expect("Failed to read tokenizer JSON");
     
     let json: Value = serde_json::from_str(&json_str)

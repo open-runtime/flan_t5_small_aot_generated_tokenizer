@@ -5,7 +5,7 @@ fn main() {
     
     // Initialize tokenizers
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Test simple cases

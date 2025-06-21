@@ -123,11 +123,11 @@ fn test_tokenization_consistency() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
     
     // Initialize HuggingFace tokenizer
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Initialize rust_tokenizers
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust_tokenizers T5");
     
     println!("Testing tokenization consistency across implementations...\n");
@@ -247,7 +247,7 @@ fn test_performance_comparison() {
     
     // Initialize tokenizers
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Single tokenization benchmark
@@ -324,7 +324,7 @@ fn test_performance_comparison() {
 #[test]
 fn test_decode_consistency() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     println!("\n=== Decode Consistency Test ===");
@@ -436,14 +436,14 @@ fn test_tokenizer_boot_time() {
     
     // Measure HuggingFace tokenizer boot time
     let start = Instant::now();
-    let _hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let _hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     let hf_boot_time = start.elapsed();
     println!("HuggingFace tokenizer boot time: {:?}", hf_boot_time);
     
     // Measure rust_tokenizers boot time
     let start = Instant::now();
-    let _rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let _rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     let rust_boot_time = start.elapsed();
     println!("rust_tokenizers boot time: {:?}", rust_boot_time);
@@ -460,10 +460,10 @@ fn test_tokenizer_execution_speed() {
     
     // Initialize tokenizers
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let all_texts = get_all_test_texts();
@@ -521,10 +521,10 @@ fn test_three_way_consensus() {
     println!("\n=== Three-Way Tokenizer Consensus Test ===\n");
     
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let mut total_tests = 0;
@@ -594,10 +594,10 @@ fn test_special_tokens_consensus() {
     ];
     
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     for token in special_tokens {
@@ -620,7 +620,7 @@ fn test_decode_consensus() {
     println!("\n=== Decode Consensus Test ===\n");
     
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Test decoding some common token sequences

@@ -1,0 +1,159 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run nightly to catch regressions
+    - cron: '0 0 * * *'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} / ${{ matrix.rust }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta, nightly]
+        exclude:
+          # Skip some combinations to save CI time
+          - os: windows-latest
+            rust: beta
+          - os: macos-latest
+            rust: beta
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        components: rustfmt, clippy
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Download tokenizer file
+      run: |
+        # Download FLAN-T5 tokenizer
+        curl -L https://huggingface.co/google/flan-t5-small/resolve/main/tokenizer.json \
+          -o flan_t5_small_tokenizer.json
+        curl -L https://huggingface.co/google/flan-t5-small/resolve/main/spiece.model \
+          -o spiece.model
+    
+    - name: Check formatting
+      if: matrix.rust == 'stable'
+      run: cargo fmt -- --check
+    
+    - name: Run clippy
+      if: matrix.rust == 'stable'
+      run: cargo clippy -- -D warnings
+    
+    - name: Build
+      run: cargo build --verbose --all-features
+    
+    - name: Run unit tests
+      run: cargo test --lib --verbose
+    
+    - name: Run consensus tests
+      run: cargo test --test consensus_tests --verbose -- --nocapture
+    
+    - name: Run stress tests
+      run: cargo test --test stress_tests --verbose
+    
+    - name: Run integration tests
+      run: cargo test --test integration_tests --verbose
+    
+    - name: Run doc tests
+      run: cargo test --doc --verbose
+    
+    - name: Run benchmarks (check only)
+      run: cargo bench --no-run
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+    
+    - name: Install tarpaulin
+      run: cargo install cargo-tarpaulin
+    
+    - name: Download tokenizer file
+      run: |
+        curl -L https://huggingface.co/google/flan-t5-small/resolve/main/tokenizer.json \
+          -o flan_t5_small_tokenizer.json
+        curl -L https://huggingface.co/google/flan-t5-small/resolve/main/spiece.model \
+          -o spiece.model
+    
+    - name: Generate coverage
+      run: cargo tarpaulin --out Xml --all-features --verbose
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./cobertura.xml
+        fail_ci_if_error: true
+
+  fuzzing:
+    name: Fuzzing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust nightly
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: nightly
+    
+    - name: Install cargo-fuzz
+      run: cargo install cargo-fuzz
+    
+    - name: Run fuzzer
+      run: |
+        cd fuzz
+        cargo +nightly fuzz run fuzz_tokenizer -- -max_total_time=300 -print_final_stats=1
+
+  miri:
+    name: Miri (Undefined Behavior Detection)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Miri
+      run: |
+        rustup toolchain install nightly --component miri
+        rustup override set nightly
+        cargo miri setup
+    
+    - name: Run Miri
+      run: cargo miri test --lib
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions-rust-lang/audit@v1 

@@ -17,7 +17,6 @@ target/
 #.idea/
 
 # Rust
-target/
 Cargo.lock
 
 # IDE
@@ -35,8 +34,24 @@ Thumbs.db
 *.profraw
 *.profdata
 
-# Tokenizer files (for testing)
-tokenizer.json
-
 # Environment
-.envsrc/tokenizer_data.g.rs
+.env
+
+# Generated files
+src/tokenizer_data.g.rs
+
+# Model files (tracked with Git LFS)
+# These are large files that should be tracked with Git LFS
+# model/*.json
+# model/*.model
+# model/*.parquet
+# model/*.safetensors
+
+# Temporary files
+*.tmp
+*.bak
+
+# Python artifacts (from validation scripts)
+__pycache__/
+*.py[cod]
+*$py.class

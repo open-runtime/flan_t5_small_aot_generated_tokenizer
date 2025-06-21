@@ -10,7 +10,7 @@ fn download_t5_model_files() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let cache_dir = PathBuf::from("tests/t5_model_cache");
     fs::create_dir_all(&cache_dir)?;
     
-    let model_path = cache_dir.join("spiece.model");
+    let model_path = cache_dir.join("model/spiece.model");
     
     // Check if already downloaded
     if model_path.exists() {

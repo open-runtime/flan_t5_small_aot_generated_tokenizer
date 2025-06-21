@@ -29,13 +29,13 @@ fn bench_cold_start(c: &mut Criterion) {
     
     group.bench_function("hf_tokenizer", |b| {
         b.iter(|| {
-            let _ = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json");
+            let _ = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json");
         });
     });
     
     group.bench_function("rust_tokenizer", |b| {
         b.iter(|| {
-            let _ = T5Tokenizer::from_file("spiece.model", false);
+            let _ = T5Tokenizer::from_file("model/spiece.model", false);
         });
     });
     
@@ -44,9 +44,9 @@ fn bench_cold_start(c: &mut Criterion) {
 
 fn bench_tokenization_by_size(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let mut group = c.benchmark_group("tokenization_by_char_count");
@@ -99,9 +99,9 @@ fn bench_tokenization_by_size(c: &mut Criterion) {
 
 fn bench_tokenization_by_type(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let mut group = c.benchmark_group("tokenization_by_type");
@@ -154,9 +154,9 @@ fn bench_batch_processing(c: &mut Criterion) {
         max_batch_size: 200,
         ..Default::default()
     });
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let mut group = c.benchmark_group("batch_processing");
@@ -207,9 +207,9 @@ fn bench_batch_processing(c: &mut Criterion) {
 
 fn bench_token_count_scaling(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     let mut group = c.benchmark_group("token_count_scaling");
@@ -261,7 +261,7 @@ fn bench_token_count_scaling(c: &mut Criterion) {
 
 fn bench_decode_performance(c: &mut Criterion) {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut group = c.benchmark_group("decode_performance");
@@ -315,11 +315,11 @@ fn detailed_performance_report() {
     let our_cold = start.elapsed();
     
     let start = Instant::now();
-    let _ = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json").unwrap();
+    let _ = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json").unwrap();
     let hf_cold = start.elapsed();
     
     let start = Instant::now();
-    let _ = T5Tokenizer::from_file("spiece.model", false).unwrap();
+    let _ = T5Tokenizer::from_file("model/spiece.model", false).unwrap();
     let rust_cold = start.elapsed();
     
     println!("   Our tokenizer:    {:?}", our_cold);
@@ -331,8 +331,8 @@ fn detailed_performance_report() {
     // Token count analysis
     println!("\n2. TOKEN COUNT ANALYSIS:");
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json").unwrap();
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false).unwrap();
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json").unwrap();
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false).unwrap();
     
     for (text, name) in &[
         (SHORT_TEXT, "Short text"),

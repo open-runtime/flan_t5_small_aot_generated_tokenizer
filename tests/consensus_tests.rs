@@ -83,9 +83,9 @@ const SPECIAL_TOKENS: &[&str] = &[
 fn test_tokenization_consensus() {
     // Initialize all tokenizers
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust tokenizer");
     
     println!("\n=== Tokenization Consensus Test ===");
@@ -197,7 +197,7 @@ fn test_tokenization_consensus() {
 #[test]
 fn test_decode_consensus() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     let mut decode_mismatches = Vec::new();
@@ -241,7 +241,7 @@ fn test_decode_consensus() {
 #[test]
 fn test_special_token_handling() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Test all extra_id tokens
@@ -261,7 +261,7 @@ fn test_special_token_handling() {
 #[test] 
 fn test_viterbi_segmentation_quality() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
-    let hf_tokenizer = tokenizers::Tokenizer::from_file("flan_t5_small_tokenizer.json")
+    let hf_tokenizer = tokenizers::Tokenizer::from_file("model/flan_t5_small_tokenizer.json")
         .expect("Failed to load HuggingFace tokenizer");
     
     // Test cases where segmentation quality matters
@@ -349,7 +349,7 @@ fn test_rust_tokenizers_detailed_comparison() {
     let our_tokenizer = FlanT5Tokenizer::with_default_config();
     
     // Load rust_tokenizers T5 tokenizer
-    let rust_tokenizer = T5Tokenizer::from_file("spiece.model", false)
+    let rust_tokenizer = T5Tokenizer::from_file("model/spiece.model", false)
         .expect("Failed to load rust_tokenizers T5");
     
     for (text, test_name) in TEST_CASES.iter().take(10) {

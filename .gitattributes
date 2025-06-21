@@ -1,2 +1,17 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Git LFS tracking for large model files
+model/*.json filter=lfs diff=lfs merge=lfs -text
+model/*.model filter=lfs diff=lfs merge=lfs -text
+model/*.parquet filter=lfs diff=lfs merge=lfs -text
+model/*.safetensors filter=lfs diff=lfs merge=lfs -text
+model/*.bin filter=lfs diff=lfs merge=lfs -text
+
+# Mark certain files as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

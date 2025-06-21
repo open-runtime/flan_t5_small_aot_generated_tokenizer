@@ -23,14 +23,14 @@ use tokenizers::tokenizer::Tokenizer as HFTokenizer;
 // Global tokenizers for efficiency
 static HF_TOKENIZER: Lazy<Arc<Mutex<HFTokenizer>>> = Lazy::new(|| {
     Arc::new(Mutex::new(
-        HFTokenizer::from_file("flan_t5_small_tokenizer.json")
+        HFTokenizer::from_file("model/flan_t5_small_tokenizer.json")
             .expect("Failed to load HF tokenizer"),
     ))
 });
 
 static RUST_TOKENIZER: Lazy<Arc<T5Tokenizer>> = Lazy::new(|| {
     Arc::new(
-        T5Tokenizer::from_file("spiece.model", false)
+        T5Tokenizer::from_file("model/spiece.model", false)
             .expect("Failed to load rust tokenizer")
     )
 });
