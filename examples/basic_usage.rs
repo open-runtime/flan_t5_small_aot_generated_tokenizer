@@ -54,10 +54,10 @@ fn main() -> flan_t5_tokenizer::Result<()> {
     let mut custom_config = TokenizerConfig::default();
     custom_config.max_length = 50;
     custom_config.pad_to_max_length = true;
-    custom_config.lowercase = true;
+    custom_config.add_eos_token = true;
     
     let custom_tokenizer = FlanT5Tokenizer::new(custom_config);
-    let text = "This is a MIXED case TEXT that will be LOWERCASED!";
+    let text = "This text will be padded to the max length!";
     let tokens = custom_tokenizer.encode(text)?;
     let decoded = custom_tokenizer.decode(&tokens)?;
     

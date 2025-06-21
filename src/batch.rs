@@ -27,47 +27,17 @@ impl Default for BatchConfig {
 pub struct BatchTokenizer {
     tokenizer: Arc<FlanT5Tokenizer>,
     config: BatchConfig,
-    sender: Sender<BatchRequest>,
-    result_receiver: Arc<Mutex<Receiver<BatchResult>>>,
-}
-
-struct BatchRequest {
-    id: usize,
-    text: String,
-}
-
-struct BatchResult {
-    id: usize,
-    tokens: Result<Vec<u32>>,
 }
 
 impl BatchTokenizer {
     pub fn new(tokenizer: FlanT5Tokenizer, config: BatchConfig) -> Self {
-        let tokenizer = Arc::new(tokenizer);
-        let (request_sender, request_receiver) = bounded(1000);
-        let (result_sender, result_receiver) = bounded(1000);
-        
-        // Spawn batch processing thread
-        let tokenizer_clone = tokenizer.clone();
-        let config_clone = config.clone();
-        std::thread::spawn(move || {
-            Self::batch_worker(
-                request_receiver,
-                result_sender,
-                tokenizer_clone,
-                config_clone,
-            );
-        });
-        
         Self {
-            tokenizer,
+            tokenizer: Arc::new(tokenizer),
             config,
-            sender: request_sender,
-            result_receiver: Arc::new(Mutex::new(result_receiver)),
         }
     }
     
-    /// Process a batch of texts
+    /// Process a batch of texts with zero-copy
     pub fn encode_batch(&self, texts: &[&str]) -> Result<Vec<Vec<u32>>> {
         if texts.len() > self.config.max_batch_size * 10 {
             return Err(TokenizerError::BatchTooLarge {
@@ -84,26 +54,122 @@ impl BatchTokenizer {
                 .collect();
         }
         
-        #[cfg(not(feature = "parallel"))]
-        if texts.len() > self.config.max_batch_size {
-            return texts.iter()
-                .map(|text| self.tokenizer.encode(text))
-                .collect();
+        // For smaller batches or non-parallel builds
+        texts.iter()
+            .map(|text| self.tokenizer.encode(text))
+            .collect()
+    }
+    
+    /// Process a batch with pre-allocated output
+    pub fn encode_batch_preallocated(&self, texts: &[&str], output: &mut Vec<Vec<u32>>) -> Result<()> {
+        output.clear();
+        output.reserve(texts.len());
+        
+        for text in texts {
+            output.push(self.tokenizer.encode(text)?);
         }
         
-        // Use batch queue for smaller batches
+        Ok(())
+    }
+    
+    /// Process streaming batches with a callback
+    pub fn encode_stream<F>(&self, texts: &[&str], mut callback: F) -> Result<()>
+    where
+        F: FnMut(usize, Vec<u32>) -> Result<()>,
+    {
+        #[cfg(feature = "parallel")]
+        if texts.len() > self.config.max_batch_size {
+            let results: Vec<_> = texts.par_iter()
+                .enumerate()
+                .map(|(idx, text)| (idx, self.tokenizer.encode(text)))
+                .collect();
+                
+            for (idx, result) in results {
+                callback(idx, result?)?;
+            }
+            return Ok(());
+        }
+        
+        for (idx, text) in texts.iter().enumerate() {
+            callback(idx, self.tokenizer.encode(text)?)?;
+        }
+        
+        Ok(())
+    }
+}
+
+/// Zero-copy batch request for advanced usage
+pub struct BatchRequest<'a> {
+    pub id: usize,
+    pub text: &'a str,
+}
+
+/// Batch result
+pub struct BatchResult {
+    pub id: usize,
+    pub tokens: Result<Vec<u32>>,
+}
+
+/// Advanced batch processor with worker threads
+pub struct AsyncBatchTokenizer {
+    tokenizer: Arc<FlanT5Tokenizer>,
+    config: BatchConfig,
+    sender: Sender<BatchRequest<'static>>,
+    receiver: Arc<Mutex<Receiver<BatchResult>>>,
+}
+
+impl AsyncBatchTokenizer {
+    /// Create a new async batch tokenizer
+    pub fn new(tokenizer: FlanT5Tokenizer, config: BatchConfig) -> Self {
+        let tokenizer = Arc::new(tokenizer);
+        let (tx, rx) = bounded::<BatchRequest<'static>>(1000);
+        let (result_tx, result_rx) = bounded::<BatchResult>(1000);
+        
+        // Spawn worker threads
+        let num_workers = config.num_workers;
+        for _ in 0..num_workers {
+            let tokenizer_clone = Arc::clone(&tokenizer);
+            let rx_clone = rx.clone();
+            let tx_clone = result_tx.clone();
+            
+            std::thread::spawn(move || {
+                while let Ok(request) = rx_clone.recv() {
+                    let tokens = tokenizer_clone.encode(request.text);
+                    let _ = tx_clone.send(BatchResult {
+                        id: request.id,
+                        tokens,
+                    });
+                }
+            });
+        }
+        
+        Self {
+            tokenizer,
+            config,
+            sender: tx,
+            receiver: Arc::new(Mutex::new(result_rx)),
+        }
+    }
+    
+    /// Process a batch asynchronously
+    pub fn encode_batch_async(&self, texts: &[&str]) -> Result<Vec<Vec<u32>>> {
         let mut results = vec![None; texts.len()];
         
         // Send all requests
         for (id, text) in texts.iter().enumerate() {
-            self.sender.send(BatchRequest {
+            // We need to ensure the text lives long enough
+            // In practice, the caller should ensure this
+            let request = BatchRequest {
                 id,
-                text: text.to_string(),
-            }).map_err(|_| TokenizerError::TokenNotFound("Batch queue closed".into()))?;
+                text: unsafe { std::mem::transmute(*text) },
+            };
+            
+            self.sender.send(request)
+                .map_err(|_| TokenizerError::TokenNotFound("Batch queue closed".into()))?;
         }
         
         // Collect results
-        let receiver = self.result_receiver.lock();
+        let receiver = self.receiver.lock();
         for _ in 0..texts.len() {
             let result = receiver.recv()
                 .map_err(|_| TokenizerError::TokenNotFound("Result queue closed".into()))?;
@@ -111,71 +177,5 @@ impl BatchTokenizer {
         }
         
         Ok(results.into_iter().map(|r| r.unwrap()).collect())
-    }
-    
-    fn batch_worker(
-        receiver: Receiver<BatchRequest>,
-        sender: Sender<BatchResult>,
-        tokenizer: Arc<FlanT5Tokenizer>,
-        config: BatchConfig,
-    ) {
-        let mut batch = Vec::with_capacity(config.max_batch_size);
-        
-        loop {
-            // Collect batch
-            let deadline = std::time::Instant::now() + config.batch_timeout;
-            
-            while batch.len() < config.max_batch_size {
-                let timeout = deadline.saturating_duration_since(std::time::Instant::now());
-                match receiver.recv_timeout(timeout) {
-                    Ok(request) => batch.push(request),
-                    Err(_) => break,
-                }
-            }
-            
-            if batch.is_empty() {
-                // Check if we should exit
-                if receiver.is_empty() {
-                    // Try to receive with a small timeout to check if channel is still alive
-                    match receiver.recv_timeout(std::time::Duration::from_millis(100)) {
-                        Ok(request) => batch.push(request),
-                        Err(_) => break, // Channel closed or timeout
-                    }
-                    continue;
-                }
-            }
-            
-            // Process batch
-            #[cfg(feature = "parallel")]
-            let results: Vec<_> = batch
-                .par_drain(..)
-                .map(|request| {
-                    let tokens = tokenizer.encode(&request.text);
-                    BatchResult {
-                        id: request.id,
-                        tokens,
-                    }
-                })
-                .collect();
-                
-            #[cfg(not(feature = "parallel"))]
-            let results: Vec<_> = batch
-                .drain(..)
-                .map(|request| {
-                    let tokens = tokenizer.encode(&request.text);
-                    BatchResult {
-                        id: request.id,
-                        tokens,
-                    }
-                })
-                .collect();
-            
-            // Send results
-            for result in results {
-                if sender.send(result).is_err() {
-                    break;
-                }
-            }
-        }
     }
 } 

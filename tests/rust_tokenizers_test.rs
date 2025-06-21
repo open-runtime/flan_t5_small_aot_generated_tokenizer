@@ -5,7 +5,7 @@ use std::path::PathBuf;
 // Helper to download T5 model files for rust_tokenizers
 fn download_t5_model_files() -> Result<PathBuf, Box<dyn std::error::Error>> {
     use std::fs;
-    use std::io::Write;
+    
     
     let cache_dir = PathBuf::from("tests/t5_model_cache");
     fs::create_dir_all(&cache_dir)?;

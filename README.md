@@ -6,7 +6,7 @@ High-performance, pure Rust implementation of the FLAN-T5 tokenizer with compile
 
 - **Zero Runtime Overhead**: Vocabulary embedded at compile time using perfect hash functions
 - **Batch Processing**: Lock-free batch tokenization with configurable workers
-- **Candle Integration**: Direct tensor creation for ML inference
+- **Candle Integration**: Direct tensor creation for ML inference (with `candle` feature)
 - **Memory Efficient**: Tensor pooling and cache-friendly data structures
 - **Production Ready**: Comprehensive error handling and monitoring
 
@@ -20,27 +20,42 @@ High-performance, pure Rust implementation of the FLAN-T5 tokenizer with compile
 ## Usage
 
 ```rust
-use flan_t5_tokenizer::{FlanT5Tokenizer, TokenizerCandle, BatchTokenizer, BatchConfig};
-use candle_core::Device;
+use flan_t5_tokenizer::{FlanT5Tokenizer, BatchTokenizer, BatchConfig};
 
 // Single tokenization
 let tokenizer = FlanT5Tokenizer::with_default_config();
-let tokens = tokenizer.encode("Hello world!")?;
+let tokens = tokenizer.encode("Hello world!").unwrap();
+let decoded = tokenizer.decode(&tokens).unwrap();
 
 // Batch tokenization
 let batch_tokenizer = BatchTokenizer::new(tokenizer.clone(), Default::default());
-let results = batch_tokenizer.encode_batch(&["Text 1", "Text 2"])?;
+let results = batch_tokenizer.encode_batch(&["Text 1", "Text 2"]).unwrap();
 
-// Direct Candle tensor creation
+// Special tokens handling
+let special_tokens = tokenizer.encode("<extra_id_0>").unwrap();
+```
+
+### With Candle Integration
+
+Enable the `candle` feature in your `Cargo.toml`:
+```toml
+flan-t5-tokenizer = { version = "0.1", features = ["candle"] }
+```
+
+Then use Candle integration:
+```rust,ignore
+use flan_t5_tokenizer::{FlanT5Tokenizer, TokenizerCandle};
+use candle_core::Device;
+
+let tokenizer = FlanT5Tokenizer::with_default_config();
 let device = Device::Cpu;
 let tensors = tokenizer.tokenize_to_tensor("ML inference text", &device)?;
 ```
 
 ## Building
 
-Set the tokenizer path before building:
+The tokenizer vocabulary is embedded at compile time. Ensure `flan_t5_small_tokenizer.json` is in the project root:
 ```bash
-export FLAN_T5_TOKENIZER_PATH=/path/to/tokenizer.json
 cargo build --release
 ```
 

@@ -1,44 +1,30 @@
-use crate::{Result, TokenizerError, VOCAB, VOCAB_SCORES, VOCAB_SIZE, id_to_token};
-use crate::{PAD_TOKEN_ID, EOS_TOKEN_ID, UNK_TOKEN_ID};
+use crate::{
+    error::{Result, TokenizerError},
+};
+use crate::TokenizerConfig;
 use ahash::AHashMap;
-use std::borrow::Cow;
+use std::sync::Arc;
+use std::hash::{Hash, Hasher};
+use ahash::AHasher;
+
+// Import generated vocabulary data
+include!(concat!(env!("OUT_DIR"), "/tokenizer_data.rs"));
 
 const WHITESPACE_MARKER: char = '▁';
 const BYTE_FALLBACK_PREFIX: &str = "<0x";
-const MAX_TOKEN_LENGTH: usize = 16;
-
-#[derive(Clone, Debug)]
-pub struct TokenizerConfig {
-    pub max_length: usize,
-    pub add_eos: bool,
-    pub add_bos: bool,
-    pub pad_to_max_length: bool,
-    pub lowercase: bool,
-}
-
-impl Default for TokenizerConfig {
-    fn default() -> Self {
-        Self {
-            max_length: 512,
-            add_eos: false,  // HuggingFace doesn't add EOS by default
-            add_bos: false,
-            pad_to_max_length: false,
-            lowercase: false,
-        }
-    }
-}
 
 pub struct FlanT5Tokenizer {
-    pub(crate) config: TokenizerConfig,
-    // Cache for subword tokenization
-    cache: parking_lot::RwLock<AHashMap<String, Vec<u32>>>,
+    pub config: TokenizerConfig,
+    // Zero-copy cache: hash of text -> Arc<Vec<u32>>
+    cache: parking_lot::RwLock<AHashMap<u64, Arc<Vec<u32>>>>,
 }
 
 impl Clone for FlanT5Tokenizer {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            cache: parking_lot::RwLock::new(AHashMap::new()),
+            // Create a new empty cache for the cloned instance
+            cache: parking_lot::RwLock::new(AHashMap::with_capacity(10_000)),
         }
     }
 }
@@ -55,55 +41,135 @@ impl FlanT5Tokenizer {
         Self::new(TokenizerConfig::default())
     }
     
-    /// Tokenize a single text string
-    pub fn encode(&self, text: &str) -> Result<Vec<u32>> {
-        let processed = self.preprocess(text);
-        let mut tokens = self.tokenize_internal(&processed)?;
-        
-        // Add special tokens
-        if self.config.add_bos {
-            tokens.insert(0, 0); // BOS token
+    /// Get a stable hash of text for cache key
+    #[inline]
+    fn hash_text(text: &str) -> u64 {
+        let mut hasher = AHasher::default();
+        text.hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    /// Clone tokenizer for batch processing
+    pub fn for_batch(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            cache: parking_lot::RwLock::new(AHashMap::new()),
         }
-        if self.config.add_eos {
+    }
+    
+    /// Encode text to token IDs
+    pub fn encode(&self, text: &str) -> Result<Vec<u32>> {
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+        
+        if text.len() > self.config.max_length * 6 {
+            return Err(TokenizerError::TextTooLong {
+                length: text.len(),
+                max_length: self.config.max_length * 6,
+            });
+        }
+        
+        // Check cache first with zero-copy
+        let cache_key = Self::hash_text(text);
+        {
+            let cache = self.cache.read();
+            if let Some(tokens) = cache.get(&cache_key) {
+                // Return cloned Arc data (cheap clone)
+                return Ok((**tokens).clone());
+            }
+        }
+        
+        // Preprocess text and tokenize
+        let processed = self.preprocess_text(text);
+        let mut tokens = self.tokenize_with_viterbi_zero_copy(&processed)?;
+        
+        // Apply post-processing
+        if self.config.add_eos_token {
             tokens.push(EOS_TOKEN_ID);
         }
         
-        // Truncate if needed
+        // Apply truncation if needed
         if tokens.len() > self.config.max_length {
             tokens.truncate(self.config.max_length);
-            if self.config.add_eos {
+            if self.config.add_eos_token && tokens.last() != Some(&EOS_TOKEN_ID) {
                 tokens[self.config.max_length - 1] = EOS_TOKEN_ID;
             }
         }
         
-        // Pad if needed
-        if self.config.pad_to_max_length {
+        // Apply padding if configured
+        if self.config.pad_to_max_length && tokens.len() < self.config.max_length {
             tokens.resize(self.config.max_length, PAD_TOKEN_ID);
+        }
+        
+        // Store in cache with Arc
+        let arc_tokens = Arc::new(tokens.clone());
+        {
+            let mut cache = self.cache.write();
+            cache.insert(cache_key, Arc::clone(&arc_tokens));
         }
         
         Ok(tokens)
     }
     
-    /// Decode token IDs back to text
+    /// Zero-allocation text preprocessing
+    fn preprocess_text(&self, text: &str) -> String {
+        let mut result = String::with_capacity(text.len() * 2);
+        
+        let mut is_start = true;
+        let mut prev_was_whitespace = false;
+        
+        for ch in text.chars() {
+            if is_whitespace(&ch) {
+                if !prev_was_whitespace && !is_start {
+                    result.push('▁');
+                }
+                prev_was_whitespace = true;
+            } else if is_cjk_char(ch) {
+                if !is_start && !prev_was_whitespace {
+                    result.push('▁');
+                }
+                result.push(ch);
+                result.push('▁');
+                prev_was_whitespace = true;
+            } else {
+                if is_start && self.config.add_prefix_space {
+                    result.push('▁');
+                }
+                result.push(ch);
+                prev_was_whitespace = false;
+                is_start = false;
+            }
+        }
+        
+        result
+    }
+    
+    /// Decode token IDs back to text with pre-calculated size
     pub fn decode(&self, token_ids: &[u32]) -> Result<String> {
-        let mut text = String::with_capacity(token_ids.len() * 4);
+        if token_ids.is_empty() {
+            return Ok(String::new());
+        }
+        
+        // Pre-calculate approximate size needed
+        let estimated_size = token_ids.len() * 4;
+        let mut text = String::with_capacity(estimated_size);
+        
+        let mut is_first = true;
         
         for &id in token_ids {
-            // Skip special tokens
             if id == PAD_TOKEN_ID || id == EOS_TOKEN_ID {
                 continue;
             }
             
             if let Some(token) = id_to_token(id) {
-                // Handle whitespace marker
-                if token.starts_with(WHITESPACE_MARKER) {
-                    if !text.is_empty() {
+                if let Some(suffix) = token.strip_prefix(METASPACE_REPLACEMENT) {
+                    if !is_first {
                         text.push(' ');
                     }
-                    text.push_str(&token[WHITESPACE_MARKER.len_utf8()..]);
-                } else if token.starts_with(BYTE_FALLBACK_PREFIX) {
-                    // Handle byte fallback tokens
-                    if let Some(byte_val) = parse_byte_fallback(token) {
+                    text.push_str(suffix);
+                } else if let Some(hex_byte) = token.strip_prefix("<0x").and_then(|s| s.strip_suffix('>')) {
+                    if let Ok(byte_val) = u8::from_str_radix(hex_byte, 16) {
                         text.push(byte_val as char);
                     } else {
                         text.push_str(token);
@@ -111,224 +177,131 @@ impl FlanT5Tokenizer {
                 } else {
                     text.push_str(token);
                 }
+                is_first = false;
             } else {
                 return Err(TokenizerError::InvalidTokenId(id));
             }
         }
         
+        text.shrink_to_fit();
         Ok(text)
     }
     
+    /// Check if a token exists in vocabulary
+    #[inline]
+    pub fn token_to_id(&self, token: &str) -> Option<u32> {
+        TOKEN_TO_ID.get(token).copied()
+    }
+    
+    /// Get token string from ID
+    #[inline]
+    pub fn id_to_token(&self, id: u32) -> Option<&'static str> {
+        id_to_token(id)
+    }
+    
     /// Get vocabulary size
-    pub const fn vocab_size(&self) -> usize {
+    #[inline]
+    pub fn vocab_size(&self) -> usize {
         VOCAB_SIZE
     }
     
-    /// Clear the tokenization cache
+    /// Check cache status
+    pub fn cache_stats(&self) -> (usize, usize) {
+        let cache = self.cache.read();
+        let size = cache.len();
+        let capacity = cache.capacity();
+        (size, capacity)
+    }
+    
+    /// Clear the cache
     pub fn clear_cache(&self) {
         self.cache.write().clear();
     }
-    
-    fn preprocess<'a>(&self, text: &'a str) -> Cow<'a, str> {
-        if self.config.lowercase {
-            Cow::Owned(text.to_lowercase())
-        } else {
-            Cow::Borrowed(text)
-        }
-    }
-    
-    fn tokenize_internal(&self, text: &str) -> Result<Vec<u32>> {
-        // Check cache first
-        {
-            let cache = self.cache.read();
-            if let Some(tokens) = cache.get(text) {
-                return Ok(tokens.clone());
-            }
-        }
-        
-        // Perform SentencePiece-style tokenization
-        let tokens = self.sentencepiece_tokenize(text)?;
-        
-        // Update cache
-        {
-            let mut cache = self.cache.write();
-            cache.insert(text.to_string(), tokens.clone());
-        }
-        
-        Ok(tokens)
-    }
-    
-    fn sentencepiece_tokenize(&self, text: &str) -> Result<Vec<u32>> {
-        // T5 uses SentencePiece with metaspace preprocessing
-        
-        // Empty string returns empty tokens
+}
+
+// Zero-copy Viterbi implementation
+impl FlanT5Tokenizer {
+    /// Zero-copy Viterbi tokenization working directly with string slices
+    fn tokenize_with_viterbi_zero_copy(&self, text: &str) -> Result<Vec<u32>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
         
-        // Apply Viterbi to the entire text with proper space handling
-        self.viterbi_tokenize_with_metaspace(text)
-    }
-    
-    /// Viterbi algorithm with metaspace handling for T5/SentencePiece
-    fn viterbi_tokenize_with_metaspace(&self, text: &str) -> Result<Vec<u32>> {
-        // Convert text to handle spaces according to SentencePiece rules
-        // - Replace spaces with temporary markers to handle them properly
-        // - We'll process the text character by character, treating spaces specially
-        
-        let chars: Vec<char> = text.chars().collect();
-        let n = chars.len();
-        
-        if n == 0 {
-            return Ok(vec![]);
+        // Check if entire text is a single known token
+        if let Some(&token_id) = TOKEN_TO_ID.get(text) {
+            return Ok(vec![token_id]);
         }
         
-        // Dynamic programming arrays
-        let mut best_score = vec![f64::INFINITY; n + 1];
-        let mut best_prev = vec![0usize; n + 1];
-        let mut best_token = vec![0u32; n + 1];
+        // For single character
+        if text.chars().count() == 1 {
+            if let Some(&token_id) = TOKEN_TO_ID.get(text) {
+                return Ok(vec![token_id]);
+            } else {
+                return Ok(vec![UNK_TOKEN_ID]);
+            }
+        }
+        
+        // Initialize Viterbi arrays using byte indices
+        let text_len = text.len();
+        let mut best_score = vec![f64::INFINITY; text_len + 1];
+        let mut best_token_id = vec![0u32; text_len + 1];
+        let mut best_token_start = vec![0usize; text_len + 1];
         
         best_score[0] = 0.0;
         
-        // For each position in the text
-        for i in 0..n {
-            if best_score[i] == f64::INFINITY {
+        // Process using byte indices
+        let mut byte_indices: Vec<(usize, char)> = text.char_indices().collect();
+        byte_indices.push((text_len, '\0')); // Sentinel for end
+        
+        for i in 0..byte_indices.len() - 1 {
+            let (start_byte, _) = byte_indices[i];
+            
+            if best_score[start_byte].is_infinite() {
                 continue;
             }
             
-            // Skip if this is a space character - spaces are not tokenized directly
-            if chars[i].is_whitespace() {
-                // Space transitions to next position with no cost
-                if best_score[i] < best_score[i + 1] {
-                    best_score[i + 1] = best_score[i];
-                    best_prev[i + 1] = i;
-                    best_token[i + 1] = 0; // Marker for space
+            // Check all possible token lengths from this position
+            for j in (i + 1)..byte_indices.len().min(i + 100) {
+                let (end_byte, _) = byte_indices[j];
+                let candidate = &text[start_byte..end_byte];
+                
+                // Check if this substring exists in vocabulary
+                if let Some(&token_id) = TOKEN_TO_ID.get(candidate) {
+                    let token_score = TOKEN_SCORES.get(candidate).copied().unwrap_or(10.0);
+                    let score = best_score[start_byte] + token_score;
+                    
+                    if score < best_score[end_byte] {
+                        best_score[end_byte] = score;
+                        best_token_id[end_byte] = token_id;
+                        best_token_start[end_byte] = start_byte;
+                    }
                 }
-                continue;
             }
             
-            // Try all possible tokens starting at position i
-            let max_end = (i + 50).min(n);
-            
-            // Build potential tokens incrementally
-            let mut token_str = String::new();
-            let mut first_char = true;
-            
-            for j in i..max_end {
-                if chars[j].is_whitespace() {
-                    // Stop at space - we'll handle space transitions separately
-                    break;
-                }
+            // Handle unknown character - single character fallback
+            if i + 1 < byte_indices.len() {
+                let (next_byte, _) = byte_indices[i + 1];
+                let unk_score = best_score[start_byte] + 10.0; // Penalty for unknown
                 
-                token_str.push(chars[j]);
-                
-                // For the first token after a space (or at start), try with space marker
-                let should_try_with_marker = i == 0 || (i > 0 && chars[i - 1].is_whitespace());
-                
-                if should_try_with_marker && first_char {
-                    // Try with space marker prefix
-                    let token_with_marker = format!("▁{}", token_str);
-                    if let Some(&token_id) = VOCAB.get(token_with_marker.as_str()) {
-                        let score = VOCAB_SCORES.get(token_with_marker.as_str())
-                            .copied()
-                            .unwrap_or(10.0);
-                        
-                        let new_score = best_score[i] + score;
-                        if new_score < best_score[j + 1] {
-                            best_score[j + 1] = new_score;
-                            best_prev[j + 1] = i;
-                            best_token[j + 1] = token_id;
-                        }
-                    }
-                }
-                
-                // Always try without space marker
-                if let Some(&token_id) = VOCAB.get(token_str.as_str()) {
-                    let score = VOCAB_SCORES.get(token_str.as_str())
-                        .copied()
-                        .unwrap_or(10.0);
-                    
-                    let new_score = best_score[i] + score;
-                    if new_score < best_score[j + 1] {
-                        best_score[j + 1] = new_score;
-                        best_prev[j + 1] = i;
-                        best_token[j + 1] = token_id;
-                    }
-                }
-                
-                first_char = false;
-            }
-            
-            // Single character fallback
-            if i + 1 <= n && !chars[i].is_whitespace() {
-                let ch_str = chars[i].to_string();
-                
-                // Try with space marker if appropriate
-                let should_try_with_marker = i == 0 || (i > 0 && chars[i - 1].is_whitespace());
-                
-                if should_try_with_marker {
-                    let ch_with_marker = format!("▁{}", ch_str);
-                    if let Some(&token_id) = VOCAB.get(ch_with_marker.as_str()) {
-                        let score = VOCAB_SCORES.get(ch_with_marker.as_str())
-                            .copied()
-                            .unwrap_or(15.0);
-                        
-                        let new_score = best_score[i] + score;
-                        if new_score < best_score[i + 1] {
-                            best_score[i + 1] = new_score;
-                            best_prev[i + 1] = i;
-                            best_token[i + 1] = token_id;
-                        }
-                    }
-                }
-                
-                // Try without marker
-                if let Some(&token_id) = VOCAB.get(ch_str.as_str()) {
-                    let score = VOCAB_SCORES.get(ch_str.as_str())
-                        .copied()
-                        .unwrap_or(15.0);
-                    
-                    let new_score = best_score[i] + score;
-                    if new_score < best_score[i + 1] {
-                        best_score[i + 1] = new_score;
-                        best_prev[i + 1] = i;
-                        best_token[i + 1] = token_id;
-                    }
-                } else {
-                    // Unknown character - use UNK with high penalty
-                    let new_score = best_score[i] + 20.0;
-                    if new_score < best_score[i + 1] {
-                        best_score[i + 1] = new_score;
-                        best_prev[i + 1] = i;
-                        best_token[i + 1] = UNK_TOKEN_ID;
-                    }
+                if unk_score < best_score[next_byte] {
+                    best_score[next_byte] = unk_score;
+                    best_token_id[next_byte] = UNK_TOKEN_ID;
+                    best_token_start[next_byte] = start_byte;
                 }
             }
         }
         
-        // Backtrack to find the best tokenization
+        // Backtrack to find the best path
         let mut tokens = Vec::new();
-        let mut pos = n;
+        let mut pos = text_len;
         
         while pos > 0 {
-            let token_id = best_token[pos];
-            let prev_pos = best_prev[pos];
-            
-            // Skip space markers (token_id == 0)
-            if token_id != 0 {
-                tokens.push(token_id);
-            }
-            
-            pos = prev_pos;
+            let token_id = best_token_id[pos];
+            tokens.push(token_id);
+            pos = best_token_start[pos];
         }
         
         tokens.reverse();
-        
-        // Handle edge case of trailing space
-        if text.ends_with(' ') {
-            tokens.push(3); // Space marker token
-        }
-        
         Ok(tokens)
     }
 }

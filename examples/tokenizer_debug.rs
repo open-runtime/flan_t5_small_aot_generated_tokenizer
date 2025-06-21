@@ -1,4 +1,4 @@
-use flan_t5_tokenizer::{FlanT5Tokenizer, VOCAB, id_to_token};
+use flan_t5_tokenizer::{FlanT5Tokenizer, TOKEN_TO_ID, id_to_token};
 
 fn main() {
     println!("=== Detailed Tokenizer Debugging ===\n");
@@ -94,11 +94,11 @@ fn test_tokenization(our: &FlanT5Tokenizer, hf: &tokenizers::Tokenizer, text: &s
     }
 }
 
-fn check_token_mapping(our: &FlanT5Tokenizer, hf: &tokenizers::Tokenizer, token: &str) {
-    println!("\nChecking token: {:?}", token);
+fn check_token_mapping(_our: &FlanT5Tokenizer, hf: &tokenizers::Tokenizer, token: &str) {
+    println!("Checking token: {}", token);
     
     // Check if token exists in vocabulary
-    if let Some(&id) = VOCAB.get(token) {
+    if let Some(&id) = TOKEN_TO_ID.get(token) {
         println!("  Found in vocab with ID: {}", id);
         
         // See what HF encodes this as
@@ -120,7 +120,7 @@ fn analyze_vocabulary() {
     let mut token_lengths: HashMap<usize, usize> = HashMap::new();
     let mut sample_tokens: Vec<(&str, u32)> = Vec::new();
     
-    for (token, &id) in VOCAB.entries() {
+    for (token, &id) in TOKEN_TO_ID.entries() {
         // Count by prefix
         if token.starts_with("▁") {
             *prefix_counts.entry("▁ (space)").or_insert(0) += 1;
@@ -162,7 +162,7 @@ fn analyze_vocabulary() {
     println!("\nChecking specific tokens:");
     let check_tokens = vec!["recurring", "▁recurring", "recur", "▁recur", "ring", "▁ring"];
     for token in check_tokens {
-        if let Some(&id) = VOCAB.get(token) {
+        if let Some(&id) = TOKEN_TO_ID.get(token) {
             println!("  {:?} -> {}", token, id);
         } else {
             println!("  {:?} -> NOT FOUND", token);

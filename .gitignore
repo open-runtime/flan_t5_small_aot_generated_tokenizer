@@ -39,4 +39,4 @@ Thumbs.db
 tokenizer.json
 
 # Environment
-.env
+.envsrc/tokenizer_data.g.rs

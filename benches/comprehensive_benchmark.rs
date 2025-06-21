@@ -143,7 +143,7 @@ fn bench_real_world_queries(c: &mut Criterion) {
     group.bench_function("hf_tokenizer", |b| {
         b.iter(|| {
             for query in REAL_WORLD_QUERIES {
-                let _ = hf_tokenizer.encode(black_box(query), false);
+                let _ = hf_tokenizer.encode(black_box(*query), false);
             }
         });
     });
@@ -164,7 +164,7 @@ fn bench_decode(c: &mut Criterion) {
         .map(|t| our_tokenizer.encode(t).unwrap())
         .collect();
     let hf_encoded: Vec<Vec<u32>> = texts.iter()
-        .map(|t| hf_tokenizer.encode(t, false).unwrap().get_ids().to_vec())
+        .map(|t| hf_tokenizer.encode(*t, false).unwrap().get_ids().to_vec())
         .collect();
     
     for (i, name) in ["short", "medium", "long"].iter().enumerate() {
